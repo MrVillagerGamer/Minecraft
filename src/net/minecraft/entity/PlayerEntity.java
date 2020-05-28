@@ -139,7 +139,7 @@ public class PlayerEntity extends Entity {
 			x -= dx * step;
 			y -= dy * step;
 			z += dz * step;
-			Main.level.setBlock((int)x, (int)y, (int)z, Block.WATER.getId());
+			Main.level.setBlock((int)x, (int)y, (int)z, Block.STONE.getId());
 		}
 	}
 	@Override
