@@ -7,26 +7,26 @@ public abstract class Block {
 	public static final Block GRASS = new GrassBlock();
 	public static final Block DIRT = new DirtBlock();
 	public static final Block WATER = new WaterBlock();
-	public static void registerBlock(Block block) {
-		for(int i = 0; i < 256; i++) {
-			if(BLOCKS[i] == null) {
-				block.setId((char)i);
-				BLOCKS[i] = block;
-				return;
-			}
-		}
+	public static final Block WOOD = new WoodBlock();
+	public static final Block LEAVES = new LeavesBlock();
+	public static void registerBlock(int id, Block block) {
+		block.setId((char)id);
+		BLOCKS[id] = block;
 	}
 	public static void registerBlocks() {
-		registerBlock(AIR);
-		registerBlock(STONE);
-		registerBlock(GRASS);
-		registerBlock(DIRT);
-		registerBlock(WATER);
+		registerBlock(0, AIR);
+		registerBlock(1, STONE);
+		registerBlock(2, GRASS);
+		registerBlock(3, DIRT);
+		registerBlock(4, WATER);
+		registerBlock(5, WOOD);
+		registerBlock(6, LEAVES);
 	}
 	private char id = 0;
 	public abstract byte getLightLevel();
 	public abstract int getTextureIndex(int face);
 	public abstract boolean isSolid();
+	public abstract boolean isTransparent();
 	public abstract boolean isFluid();
 	private void setId(char id) {
 		this.id = id;

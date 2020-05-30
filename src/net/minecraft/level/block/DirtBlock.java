@@ -17,4 +17,8 @@ public class DirtBlock extends Block{
 	public boolean isFluid() {
 		return false;
 	}
+	@Override
+	public boolean isTransparent() {
+		return false;
+	}
 }

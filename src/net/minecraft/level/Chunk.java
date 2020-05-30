@@ -211,7 +211,7 @@ public class Chunk implements IDrawable {
 							float nx = norms[f].x;
 							float ny = norms[f].y;
 							float nz = norms[f].z;
-							if(!Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isSolid()) {
+							if(!Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isSolid() || Block.BLOCKS[block[x][y][z]].isTransparent() || Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isTransparent()) {
 								for(int p = 0; p < 6; p++) {
 									float px = x + verts[tris[f][p]].x;
 									float py = y + verts[tris[f][p]].y;
@@ -224,7 +224,8 @@ public class Chunk implements IDrawable {
 									b += Main.level.getLightLevel((int)(px+this.x+0.5f), (int)(py+0.5f), (int)(pz+this.z-0.5f))/16.0f;
 									b += Main.level.getLightLevel((int)(px+this.x-0.5f), (int)(py-0.5f), (int)(pz+this.z-0.5f))/16.0f;
 									b += Main.level.getLightLevel((int)(px+this.x-0.5f), (int)(py+0.5f), (int)(pz+this.z-0.5f))/16.0f;
-									b /= 6.0f;
+									b /= 7.0f;
+									b += 1f / 8.0f;
 									GL11.glColor3f(b, b, b);
 									GL11.glNormal3f(nx, ny, nz);
 									int t = Block.BLOCKS[block[x][y][z]].getTextureIndex(f);
@@ -281,6 +282,7 @@ public class Chunk implements IDrawable {
 	public void unload() {
 		if(dlid != -1) {
 			GL11.glDeleteLists(dlid, 1);
+			dlid = -1;
 		}
 	}
 }

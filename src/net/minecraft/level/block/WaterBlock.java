@@ -17,4 +17,8 @@ public class WaterBlock extends Block {
 	public boolean isFluid() {
 		return true;
 	}
+	@Override
+	public boolean isTransparent() {
+		return false;
+	}
 }

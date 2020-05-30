@@ -24,8 +24,8 @@ public class Collision {
 		float py = transform.position.y+direction.y;
 		float pz = transform.position.z+direction.z;
 		float step = STEP;
-		for(float i = -transform.scale.x/2.0f; i <= transform.scale.x/2.0f; i+=step) {
-			for(float j = -transform.scale.y/2.0f; j <= transform.scale.y/2.0f; j+=step) {
+		for(float i = -transform.scale.x/2.0f; i <= transform.scale.x/2.0f; i+=transform.scale.x) {
+			for(float j = -transform.scale.y/2.0f; j <= transform.scale.y/2.0f; j+=transform.scale.y) {
 				if(Block.BLOCKS[Main.level.getBlock((int)(px+i), (int)(py+j), (int)(pz+transform.scale.z/2.0f))].isSolid()) {
 					collided = true;
 				}
@@ -34,8 +34,8 @@ public class Collision {
 				}
 			}
 		}
-		for(float i = -transform.scale.x/2.0f; i <= transform.scale.x/2.0f; i+=step) {
-			for(float j = -transform.scale.z/2.0f; j <= transform.scale.z/2.0f; j+=step) {
+		for(float i = -transform.scale.x/2.0f; i <= transform.scale.x/2.0f; i+=transform.scale.x) {
+			for(float j = -transform.scale.z/2.0f; j <= transform.scale.z/2.0f; j+=transform.scale.z) {
 				if(Block.BLOCKS[Main.level.getBlock((int)(px+i), (int)(py+transform.scale.y/2.0f), (int)(pz+j))].isSolid()) {
 					collided = true;
 				}
@@ -44,8 +44,8 @@ public class Collision {
 				}
 			}
 		}
-		for(float i = -transform.scale.y/2.0f; i <= transform.scale.y/2.0f; i+=step) {
-			for(float j = -transform.scale.z/2.0f; j <= transform.scale.z/2.0f; j+=step) {
+		for(float i = -transform.scale.y/2.0f; i <= transform.scale.y/2.0f; i+=transform.scale.y) {
+			for(float j = -transform.scale.z/2.0f; j <= transform.scale.z/2.0f; j+=transform.scale.z) {
 				if(Block.BLOCKS[Main.level.getBlock((int)(px+transform.scale.x/2.0f), (int)(py+i), (int)(pz+j))].isSolid()) {
 					collided = true;
 				}

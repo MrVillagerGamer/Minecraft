@@ -4,8 +4,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Random;
 
 import org.lwjgl.BufferUtils;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.opengl.Texture;
@@ -13,9 +17,15 @@ import org.newdawn.slick.opengl.TextureLoader;
 
 import com.flowpowered.noise.module.source.Perlin;
 
+import net.minecraft.entity.BlocklingEntity;
+import net.minecraft.entity.CreatureEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.PlayerEntity;
 import net.minecraft.level.block.Block;
+import net.minecraft.ui.HotbarUI;
+import net.minecraft.ui.IconUI;
+import net.minecraft.ui.InventoryUI;
+import net.minecraft.ui.UI;
 import net.minecraft.util.IDrawable;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.Transform;
@@ -25,13 +35,20 @@ import net.minecraft.util.Vector3f;
 public class Level implements ITickable, IDrawable {
 	private ArrayList<Entity> entities = new ArrayList<>();
 	public Entity localPlayer = null;
+	public Entity test = null;
 	public boolean generated = false;
 	private Chunk[][] chunks = new Chunk[256][256];
 	private ArrayList<Chunk> loadedChunks = new ArrayList<>();
 	private ArrayList<Chunk> chunksToLoad = new ArrayList<>();
 	private ArrayList<Chunk> chunkUpdates = new ArrayList<>();
 	private Texture tex;
+	public UI ui = null;
+	public UI lastUi = ui;
+	public IconUI blockDispUI;
+	public InputState input = new InputState();
+	public InventoryUI inventoryUi;
 	public void addEntity(Entity e) {
+		e.load();
 		entities.add(e);
 	}
 	public void setWaterLevel(int x, int y, int z, byte l) {
@@ -218,6 +235,7 @@ public class Level implements ITickable, IDrawable {
 		GL11.glEndList();
 	}
 	public void draw() {
+		GL11.glViewport(0, 0, Display.getWidth(), Display.getHeight());
 		Vector3f pos = localPlayer.transform.position;
 		if(getWaterLevel((int)(pos.x), (int)(pos.y+getPlayerHeight()+0.5f), (int)(pos.z)) > 0) {
 			FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
@@ -236,12 +254,12 @@ public class Level implements ITickable, IDrawable {
 			fogColor.put(1);
 			fogColor.flip();
 			GL11.glFog(GL11.GL_FOG_COLOR, fogColor);
-			GL11.glFogf(GL11.GL_FOG_DENSITY, 0.01f);
+			GL11.glFogf(GL11.GL_FOG_DENSITY, 0.0133f);
 		}
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
 		GL11.glLoadIdentity();
-		GLU.gluPerspective(70.0f, 1.333f, 0.1f, 10000.0f);
+		GLU.gluPerspective(70.0f, Display.getWidth()/(float)Display.getHeight(), 0.1f, 10000.0f);
 		GL11.glMatrixMode(GL11.GL_MODELVIEW);
 		GL11.glLoadIdentity();
 		
@@ -262,12 +280,15 @@ public class Level implements ITickable, IDrawable {
 			GLU.gluLookAt(px, py, pz, px+dx, py+dy, pz-dz, 0, 1, 0);
 		}
 		for(Entity entity : entities) {
+			if(!entity.active) {
+				continue;
+			}
 			GL11.glPushMatrix();
+			Vector3f position = entity.transform.position;
+			GL11.glTranslatef(position.x, position.y, position.z);
 			GL11.glRotatef(entity.transform.rotation.x, 1, 0, 0);
 			GL11.glRotatef(entity.transform.rotation.y, 0, 1, 0);
 			GL11.glRotatef(entity.transform.rotation.z, 0, 0, 1);
-			Vector3f position = entity.transform.position;
-			GL11.glTranslatef(position.x, position.y, position.z);
 			entity.draw();
 			GL11.glPopMatrix();
 		}
@@ -277,11 +298,28 @@ public class Level implements ITickable, IDrawable {
 			chunk.draw();
 			GL11.glPopMatrix();
 		}
+		float aspect = Display.getWidth()/(float)Display.getHeight();
+		GL11.glDisable(GL11.GL_DEPTH_TEST);
+		GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+		GL11.glMatrixMode(GL11.GL_PROJECTION);
+		GL11.glLoadIdentity();
+		GL11.glOrtho(-aspect, aspect, -1, 1, -1, 1);
+		GL11.glMatrixMode(GL11.GL_MODELVIEW);
+		GL11.glLoadIdentity();
+		getUINonNull(ui).draw();
+		GL11.glEnable(GL11.GL_DEPTH_TEST);
 	}
 	Vector3f skyColor1 = new Vector3f(0.7f, 0.85f, 1.0f);
 	Vector3f underwaterColor = new Vector3f(0.2f, 0.35f, 0.5f);
 	@Override
 	public void load() {
+		inventoryUi = new InventoryUI();
+		blockDispUI = new IconUI(1, -0.9f, -0.9f, 0.2f, 0.2f) {
+			@Override
+			public void onClick(float x, float y) {
+				
+			}
+		};
 		try {
 			tex = TextureLoader.getTexture("PNG", new FileInputStream("res/terrain.png"));
 			tex.bind();
@@ -290,6 +328,10 @@ public class Level implements ITickable, IDrawable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		GL11.glEnable(GL11.GL_BLEND);
+		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		GL11.glEnable(GL11.GL_ALPHA_TEST);
+		GL11.glAlphaFunc(GL11.GL_GREATER, 0.0f);
 		GL11.glEnable(GL11.GL_FOG);
 		GL11.glFogi(GL11.GL_FOG_MODE, GL11.GL_EXP2);
 		FloatBuffer fogColor = BufferUtils.createFloatBuffer(4);
@@ -305,6 +347,7 @@ public class Level implements ITickable, IDrawable {
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		loadSky();
+		getUINonNull(ui).load();
 		localPlayer = new PlayerEntity();
 		localPlayer.transform.position = new Vector3f(chunks.length*Chunk.SIZE/2, 64, chunks[0].length*Chunk.SIZE/2);
 		localPlayer.transform.rotation = new Vector3f(-30, -45, 0);
@@ -313,18 +356,30 @@ public class Level implements ITickable, IDrawable {
 			entity.load();
 		}
 	}
+	// If ui is null, return default ui
+	// otherwise return the ui parameter
+	public UI getUINonNull(UI ui) {
+		if(ui == null) {
+			return blockDispUI;
+		}
+		return ui;
+	}
 	@Override
 	public void unload() {
+		getUINonNull(ui).load();
 		unloadSky();
 		for(Entity entity : entities) {
 			entity.unload();
 		}
 		entities.clear();
 		for(Chunk chunk : loadedChunks) {
+			chunks[chunk.x/Chunk.SIZE][chunk.z/Chunk.SIZE] = null;
 			chunk.unload();
 		}
 		loadedChunks.clear();
 		tex.release();
+		generated = false;
+		
 	}
 	public int getRenderDistance() {
 		return 12;
@@ -334,8 +389,47 @@ public class Level implements ITickable, IDrawable {
 	}
 	@Override
 	public void tick(float delta) {
-		for(Entity entity : entities) {
+		input.scroll = Mouse.getDWheel()/100;
+		input.forward = Keyboard.isKeyDown(Keyboard.KEY_W);
+		input.backward = Keyboard.isKeyDown(Keyboard.KEY_S);
+		input.inventory = false; input.jump = false;
+		input.escape = false; input.create = false;
+		input.destroy = false;
+		input.turnx = Mouse.getDX();
+		input.turny = Mouse.getDY();
+		
+		while(Keyboard.next()) {
+			if(Keyboard.getEventKeyState()) {
+				input.inventory = Keyboard.getEventKey() == Keyboard.KEY_E;
+				input.jump = Keyboard.getEventKey() == Keyboard.KEY_SPACE;
+				input.escape = Keyboard.getEventKey() == Keyboard.KEY_ESCAPE;
+			}
+		}
+
+		while(Mouse.next()) {
+			if(Mouse.getEventButtonState()) {
+				input.create = Mouse.getEventButton() == 1;
+				input.destroy = Mouse.getEventButton() == 0;
+			}
+		}
+		if(lastUi != ui) {
+			getUINonNull(lastUi).unload();
+			getUINonNull(ui).load();
+		}
+		lastUi = ui;
+		getUINonNull(ui).tick(delta);
+		Mouse.setGrabbed(ui==null);
+		for(int i = 0; i < entities.size(); i++) {
+			Entity entity = entities.get(i);
 			entity.tick(delta);
+			if(entity.dead) {
+				if(entity != localPlayer) {
+					entities.remove(entity);
+				}else {
+					unload();
+					load();
+				}
+			}
 		}
 		int camX = 0, camZ = 0;
 		if(localPlayer != null) {
@@ -358,12 +452,31 @@ public class Level implements ITickable, IDrawable {
 									if(j <= getSeaLevel()) {
 										chunk.block[i][j][k] = Block.DIRT.getId();
 									}
+									int th = 4;
+									if(new Random().nextInt()%100==0 && i >= 3 && k >= 3 && i < Chunk.SIZE-3 && k < Chunk.SIZE-3 && j+th+1 < Chunk.HEIGHT && j > getSeaLevel()) {
+										
+										for(int l = -2; l <= 2; l++) {
+											for(int m = -2; m <= 2; m++) {
+												chunk.block[i+l][h+th-2][k+m] = Block.LEAVES.getId();
+												chunk.block[i+l][h+th-1][k+m] = Block.LEAVES.getId();
+											}
+										}
+										for(int l = -1; l <= 1; l++) {
+											for(int m = -1; m <= 1; m++) {
+												chunk.block[i+l][h+th][k+m] = Block.LEAVES.getId();
+											}
+											chunk.block[i+l][h+th+1][k] = Block.LEAVES.getId();
+											chunk.block[i][h+th+1][k+l] = Block.LEAVES.getId();
+										}
+										for(int l = 0; l < 4; l++) {
+											chunk.block[i][h+l][k] = Block.WOOD.getId();
+										}
+									}
 								}else if(j >= h-3) {
 									chunk.block[i][j][k] = Block.DIRT.getId();
 								}else {
 									chunk.block[i][j][k] = Block.STONE.getId();
 								}
-								
 							}
 							for(int j = 0; j < Chunk.HEIGHT; j++) {
 								if(j < getSeaLevel() && !Block.BLOCKS[chunk.block[i][j][k]].isSolid()) {
@@ -475,8 +588,8 @@ public class Level implements ITickable, IDrawable {
 				boolean t = !Block.BLOCKS[getBlock(x+i, y, z+j)].isSolid();
 				boolean b = !Block.BLOCKS[getBlock(x+i, y-1, z+j)].isSolid();
 				
-				if(wl2 == 0 && wl > 1 && t && !b) {
-					setWaterLevel(x+i, y, z+j, (byte)(wl-1));
+				if(wl2 == 0 && wl > 4 && t && !b) {
+					setWaterLevel(x+i, y, z+j, (byte)(wl-4));
 					int cx = (x+i)/Chunk.SIZE;
 					int cz = (z+j)/Chunk.SIZE;
 					if(cx != x/Chunk.SIZE || cz!=z/Chunk.SIZE) {
@@ -484,8 +597,8 @@ public class Level implements ITickable, IDrawable {
 							chunks[cx][cz].spreadWater = true;
 						}
 					}
-				}else if(wl2 == 0 && wl > 1 && t && b) {
-					setWaterLevel(x+i, y-1, z+j, (byte)15);
+				}else if(wl2 == 0 && wl > 2 && t && b) {
+					setWaterLevel(x+i, y-1, z+j, (byte)Math.min(15, wl+3));
 					int cx = (x+i)/Chunk.SIZE;
 					int cz = (z+j)/Chunk.SIZE;
 					if(cx != x/Chunk.SIZE || cz!=z/Chunk.SIZE) {
@@ -560,13 +673,19 @@ public class Level implements ITickable, IDrawable {
 		}
 	}
 	public void addToList(ArrayList<Chunk> chunks, Chunk chunk) {
-		if(!chunks.contains(chunk)) {
+		if(!chunks.contains(chunk) && chunk != null) {
 			chunks.add(chunk);
 		}
 	}
 	public void loadLater(Chunk chunk) {
 		if(!chunksToLoad.contains(chunk)) {
 			chunksToLoad.add(chunk);
+		}
+	}
+	public void removeEntity(Entity entity) {
+		if(entities.contains(entity)) {
+			entity.unload();
+			entities.remove(entity);
 		}
 	}
 }

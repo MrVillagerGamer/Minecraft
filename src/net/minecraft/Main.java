@@ -6,15 +6,18 @@ import org.lwjgl.opengl.DisplayMode;
 
 import net.minecraft.level.Level;
 import net.minecraft.level.block.Block;
+import net.minecraft.level.item.Item;
 
 public class Main {
 	public static Level level;
 	public static boolean exiting = false;
 	public static void main(String[] args) throws LWJGLException {
 		Display.setDisplayMode(new DisplayMode(800, 600));
+		Display.setResizable(true);
 		Display.setTitle("Minecraft");
 		Display.create();
 		Block.registerBlocks();
+		Item.registerItems();
 		level = new Level();
 		level.load();
 		long lastTime = System.nanoTime();

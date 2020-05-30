@@ -17,4 +17,18 @@ public class Transform {
 		this.rotation = rotation;
 		this.scale = scale;
 	}
+	public Transform copy() {
+		Transform newT = new Transform();
+		newT.position.x = position.x;
+		newT.position.y = position.y;
+		newT.position.z = position.z;
+		newT.rotation.x = rotation.x;
+		newT.rotation.y = rotation.y;
+		newT.rotation.z = rotation.z;
+		newT.scale.x = scale.x;
+		newT.scale.y = scale.y;
+		newT.scale.z = scale.z;
+		return newT;
+		
+	}
 }

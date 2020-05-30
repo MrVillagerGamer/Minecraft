@@ -1,5 +1,7 @@
 package net.minecraft.entity;
 
+import java.util.Random;
+
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
@@ -7,92 +9,50 @@ import net.minecraft.Main;
 import net.minecraft.level.block.Block;
 import net.minecraft.util.Vector3f;
 
-public class PlayerEntity extends Entity {
+public class PlayerEntity extends CreatureEntity {
 	public PlayerEntity() {
 		transform.scale = new Vector3f(0.6f, 1.6f, 0.6f);
+		moveSpeed = 5;
+		turnSpeed = 1;
+		jumpForce = 10;
+		setMaxHealth(20);
+		setHealth(getMaxHealth());
 	}
-	float airTime = 0;
-	boolean isGrounded = false;
-	boolean jumping = false, jumpRequest = false;
+	@Override
+	public void setHealth(int health) {
+		super.setHealth(health);
+		System.out.println("Health: " + health);
+	}
+	private int sel = 1;
+	private int[] selItems = new int[0];
 	@Override
 	public void tick(float delta) {
-		float moveSpeed = 5;
-		float turnSpeed = 1;
-		float jumpForce = 10;
-		
-		if(Main.level.generated) {
-			if(Keyboard.isKeyDown(Keyboard.KEY_W)) {
-				float dx = (float) (Math.cos(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				float dz = (float) (Math.sin(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				//float dy = (float) (Math.sin(Math.toRadians(transform.rotation.x)) * moveSpeed);
-				Vector3f direction = new Vector3f(dx * delta, 0, -dz * delta);
-				Collision.move(transform, direction);
-				if(Collision.check(transform, direction) && isGrounded) {
-					jumpRequest = true;
-				}
-			}
-			if(Keyboard.isKeyDown(Keyboard.KEY_S)) {
-				float dx = (float) (Math.cos(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				float dz = (float) (Math.sin(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				//float dy = (float) (Math.sin(Math.toRadians(transform.rotation.x)) * moveSpeed);
-				Vector3f direction = new Vector3f(-dx * delta, 0, dz * delta);
-				Collision.move(transform, direction);
-			}
-			if(Keyboard.isKeyDown(Keyboard.KEY_A)) {
-				float dx = (float) (Math.sin(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				float dz = (float) (Math.cos(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				Vector3f direction = new Vector3f(-dx * delta, 0, dz * delta);
-				Collision.move(transform, direction);
-			}
-			if(Keyboard.isKeyDown(Keyboard.KEY_D)) {
-				float dx = (float) (Math.sin(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				float dz = (float) (Math.cos(Math.toRadians(transform.rotation.y)) * moveSpeed);
-				Vector3f direction = new Vector3f(dx * delta, 0, -dz * delta);
-				Collision.move(transform, direction);
-			}
-			if(jumpRequest) {
-				transform.position.y += Collision.STEP;
-				jumping = true;
-				jumpRequest = false;
-			}
-			if(jumping) {
-				Collision.move(transform, new Vector3f(0, jumpForce*delta, 0));
-			}
-			isGrounded = Collision.check(transform, new Vector3f(0, -Collision.STEP, 0));
-			if(!isGrounded) {
-				airTime += delta;
-				Collision.move(transform, new Vector3f(0, -Main.level.getGravity()*airTime*delta, 0));
-			}else {
-				airTime = 0;
-				jumping = false;
-			}
+		super.tick(delta);
+		moveDir = 0;
+		if(Main.level.input.forward) {
+			moveDir = 1;
+		}else if(Main.level.input.backward) {
+			moveDir = -1;
 		}
-		
-		while(Keyboard.next()) {
-			if(Keyboard.getEventKeyState()) {
-				if(Keyboard.getEventKey() == Keyboard.KEY_E) {
-					Mouse.setGrabbed(!Mouse.isGrabbed());
-				}
-				if(Keyboard.getEventKey() == Keyboard.KEY_ESCAPE) {
-					Main.exiting = true;
-				}
-				if(Keyboard.getEventKey() == Keyboard.KEY_SPACE && isGrounded) {
-					jumpRequest = true;
-				}
-			}
+		if(Main.level.input.create && Main.level.lastUi == null) {
+			raycastPlace();
 		}
-		while(Mouse.next()) {
-			if(Mouse.getEventButtonState()) {
-				if(Mouse.getEventButton() == 0) {
-					raycastBreak();
-				}else if(Mouse.getEventButton() == 1) {
-					raycastPlace();
-				}
-			}
+		if(Main.level.input.destroy && Main.level.lastUi == null) {
+			raycastBreak();
+		}
+		if(Main.level.input.inventory) {
+			Mouse.setGrabbed(!Mouse.isGrabbed());
+			Main.level.ui = Mouse.isGrabbed()?null:Main.level.inventoryUi;
+		}
+		if(Main.level.input.escape) {
+			Main.exiting = true;
+		}
+		if(Main.level.input.jump && isGrounded) {
+			jumpRequest = true;
 		}
 		if(Mouse.isGrabbed()) {
-			transform.rotation.x += Mouse.getDY() * turnSpeed;
-			transform.rotation.y -= Mouse.getDX() * turnSpeed;
+			transform.rotation.x += Main.level.input.turny * turnSpeed;
+			transform.rotation.y -= Main.level.input.turnx * turnSpeed;
 			if(transform.rotation.x < -89) {
 				transform.rotation.x = -89;
 			}
@@ -117,6 +77,7 @@ public class PlayerEntity extends Entity {
 			dist += step;
 		}
 		if(Block.BLOCKS[Main.level.getBlock((int)x, (int)y, (int)z)].isSolid()) {
+			int blockId = Main.level.getBlock((int)x, (int)y, (int)z);
 			Main.level.setBlock((int)x, (int)y, (int)z, Block.AIR.getId());
 		}
 	}
@@ -139,7 +100,14 @@ public class PlayerEntity extends Entity {
 			x -= dx * step;
 			y -= dy * step;
 			z += dz * step;
-			Main.level.setBlock((int)x, (int)y, (int)z, Block.STONE.getId());
+			Main.level.setBlock((int)x, (int)y, (int)z, (char)Main.level.inventoryUi.sel);
+			//Main.level.setBlock((int)x, (int)y, (int)z, Block.WATER.getId());
+			//Main.level.test.transform.position.x = x; 
+			//Main.level.test.transform.position.y = y+3;
+			//Main.level.test.transform.position.z = z;
+			//ZombieEntity zombie = new ZombieEntity();
+			//zombie.transform.position = new Vector3f((int)x+0.5f, (int)y+2.6f, (int)z+0.5f);
+			//Main.level.addEntity(zombie);
 		}
 	}
 	@Override
@@ -148,7 +116,11 @@ public class PlayerEntity extends Entity {
 	}
 	@Override
 	public void load() {
-		
+		selItems = new int[] {Block.STONE.getId(), Block.GRASS.getId(), Block.DIRT.getId(),
+				Block.WOOD.getId(), Block.LEAVES.getId()};
+		Main.level.inventoryUi.setItems(selItems);
+		Main.level.blockDispUI.id = sel;
+		Main.level.ui = Main.level.blockDispUI;
 	}
 	@Override
 	public void unload() {
