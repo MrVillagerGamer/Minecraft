@@ -10,6 +10,7 @@ import net.minecraft.util.Vector4f;
 public class ZombieEntity extends CreatureEntity {
 	BasicEntityAI ai;
 	public ZombieEntity() {
+		usePhysics = false;
 		parts = new EntityPart[6];
 		moveSpeed = 2;
 		turnSpeed = 180;
@@ -74,8 +75,9 @@ public class ZombieEntity extends CreatureEntity {
 	float damageTime = 0;
 	@Override
 	public void tick(float delta) {
+		ticking = true;
 		if(active) {
-			if(Main.level.localPlayer != null && Main.level.localPlayer instanceof CreatureEntity) {
+			/*if(Main.level.localPlayer != null && Main.level.localPlayer instanceof CreatureEntity) {
 				Vector3f dist = new Vector3f();
 				dist.x = Main.level.localPlayer.transform.position.x;
 				dist.y = Main.level.localPlayer.transform.position.y;
@@ -93,8 +95,9 @@ public class ZombieEntity extends CreatureEntity {
 					damageTime = 0;
 				}
 			}
-			ai.tick(delta);
+			ai.tick(delta);*/
 		}
 		super.tick(delta);
+		ticking = false;
 	}
 }

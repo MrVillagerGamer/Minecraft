@@ -243,7 +243,8 @@ public class Chunk implements IDrawable {
 							float ny = norms[f].y;
 							float nz = norms[f].z;
 							if(Main.level.getWaterLevel(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz) == 0 &&
-									!Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isSolid()) {
+									(!Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isSolid()
+											&& !Block.BLOCKS[Main.level.getBlock(x+this.x+(int)nx, y+(int)ny, z+this.z+(int)nz)].isTransparent())) {
 								for(int p = 0; p < 6; p++) {
 									float px = x + verts[tris[f][p]].x;
 									float py = y + verts[tris[f][p]].y;

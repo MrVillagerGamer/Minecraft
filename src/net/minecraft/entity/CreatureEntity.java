@@ -20,6 +20,7 @@ public abstract class CreatureEntity extends Entity {
 	boolean blocked = false;
 	private int health;
 	private int maxHealth;
+	protected boolean usePhysics = true;
 	@Override
 	public void load() {
 		for(EntityPart part : parts) {
@@ -72,7 +73,7 @@ public abstract class CreatureEntity extends Entity {
 	@Override
 	public void tick(float delta) {
 		super.tick(delta);
-		if(Main.level.generated && active) {
+		if(usePhysics && Main.level.generated && active) {
 			if(moveDir == 1) {
 				float dx = (float) (Math.cos(Math.toRadians(transform.rotation.y)) * moveSpeed);
 				float dz = (float) (Math.sin(Math.toRadians(transform.rotation.y)) * moveSpeed);

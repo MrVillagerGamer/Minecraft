@@ -1,5 +1,9 @@
 package net.minecraft.level;
 
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.awt.GraphicsEnvironment;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.FloatBuffer;
@@ -11,21 +15,29 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.util.glu.GLU;
+import org.newdawn.slick.TrueTypeFont;
 import org.newdawn.slick.opengl.Texture;
 import org.newdawn.slick.opengl.TextureLoader;
 
 import com.flowpowered.noise.module.source.Perlin;
 
+import net.minecraft.Constants;
+import net.minecraft.Main;
+import net.minecraft.client.Client;
 import net.minecraft.entity.BlocklingEntity;
 import net.minecraft.entity.CreatureEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.PlayerEntity;
 import net.minecraft.level.block.Block;
+import net.minecraft.level.item.Item;
+import net.minecraft.level.item.ItemStack;
 import net.minecraft.ui.HotbarUI;
 import net.minecraft.ui.IconUI;
 import net.minecraft.ui.InventoryUI;
 import net.minecraft.ui.UI;
+import net.minecraft.util.FileUtil;
 import net.minecraft.util.IDrawable;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.Transform;
@@ -41,15 +53,19 @@ public class Level implements ITickable, IDrawable {
 	private ArrayList<Chunk> loadedChunks = new ArrayList<>();
 	private ArrayList<Chunk> chunksToLoad = new ArrayList<>();
 	private ArrayList<Chunk> chunkUpdates = new ArrayList<>();
+	private ArrayList<Entity> entitiesToAdd = new ArrayList<>();
 	private Texture tex;
 	public UI ui = null;
 	public UI lastUi = ui;
 	public IconUI blockDispUI;
 	public InputState input = new InputState();
 	public InventoryUI inventoryUi;
+	public TrueTypeFont font;
+	private int lastGamemode = Constants.GAMEMODE_CREATIVE;
+	public int gamemode = Constants.GAMEMODE_SURVIVAL;
+	private int vs = -1, fs = -1, pg = -1;
 	public void addEntity(Entity e) {
-		e.load();
-		entities.add(e);
+		entitiesToAdd.add(e);
 	}
 	public void setWaterLevel(int x, int y, int z, byte l) {
 		if(y < 0 || y >= Chunk.HEIGHT) {
@@ -254,7 +270,7 @@ public class Level implements ITickable, IDrawable {
 			fogColor.put(1);
 			fogColor.flip();
 			GL11.glFog(GL11.GL_FOG_COLOR, fogColor);
-			GL11.glFogf(GL11.GL_FOG_DENSITY, 0.0133f);
+			GL11.glFogf(GL11.GL_FOG_DENSITY, 0.0233f*1.33f);
 		}
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
@@ -311,8 +327,80 @@ public class Level implements ITickable, IDrawable {
 	}
 	Vector3f skyColor1 = new Vector3f(0.7f, 0.85f, 1.0f);
 	Vector3f underwaterColor = new Vector3f(0.2f, 0.35f, 0.5f);
+	public void bindDefaultTexture() {
+		tex.bind();
+	}
+
+	public ItemStack[] inventory;
+	public void removeItemFromInventory(int item, int count) {
+		for(int i = 0; i < inventory.length; i++) {
+			if(inventory[i].item == item) {
+				inventory[i].count = Math.max(inventory[i].count-count, 0);
+				if(inventory[i].count == 0) {
+					inventory[i].item = 0;
+				}
+				break;
+			}
+		}
+		inventoryUi.setItems(inventory);
+		blockDispUI.id = inventory[inventoryUi.sel].item;
+		blockDispUI.count = inventory[inventoryUi.sel].count;
+		if(getUINonNull(ui) == blockDispUI) {
+			blockDispUI.unload();
+			blockDispUI.load();
+		}
+	}
+	public void addItemToInventory(int item, int count) {
+		int slot = 0;
+		boolean present = false;
+		for(int i = 0; i < inventory.length; i++) {
+			if(inventory[i].item == item) {
+				present = true;
+				slot = i;
+				break;
+			}
+			if(!present && inventory[i].item == 0) {
+				slot = i;
+				break;
+			}
+		}
+		inventory[slot].count += count;
+		inventory[slot].item = item;
+		inventoryUi.setItems(inventory);
+		blockDispUI.id = inventory[inventoryUi.sel].item;
+		blockDispUI.count = inventory[inventoryUi.sel].count;
+		if(getUINonNull(ui) == blockDispUI) {
+			blockDispUI.unload();
+			blockDispUI.load();
+		}
+	}
 	@Override
 	public void load() {
+		/*
+		vs = GL20.glCreateShader(GL20.GL_VERTEX_SHADER);
+		GL20.glShaderSource(vs, FileUtil.readText("/terrain.vsh"));
+		GL20.glCompileShader(vs);
+		System.out.println(GL20.glGetShaderInfoLog(vs, 1024));
+		
+		fs = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
+		GL20.glShaderSource(fs, FileUtil.readText("/terrain.fsh"));
+		GL20.glCompileShader(fs);
+		System.out.println(GL20.glGetShaderInfoLog(fs, 1024));
+		
+		pg = GL20.glCreateProgram();
+		GL20.glAttachShader(pg, vs);
+		GL20.glAttachShader(pg, fs);
+		GL20.glLinkProgram(pg);
+		System.out.println(GL20.glGetProgramInfoLog(pg, 1024));
+		GL20.glValidateProgram(pg);
+		GL20.glUseProgram(pg);
+		*/
+		
+		//Font font = Font.createFont(Font.TRUETYPE_FONT, new File("res/font.ttf"));
+		//font = font.deriveFont(4f);
+		//GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+		Font font = new Font("Consolas", Font.PLAIN, 10);
+		this.font = new TrueTypeFont(font, false);
 		inventoryUi = new InventoryUI();
 		blockDispUI = new IconUI(1, -0.9f, -0.9f, 0.2f, 0.2f) {
 			@Override
@@ -328,6 +416,20 @@ public class Level implements ITickable, IDrawable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+
+		inventory = new ItemStack[20];
+		survivalInventory = new ItemStack[20];
+		for(int i = 0; i < inventory.length; i++) {
+			inventory[i] = new ItemStack();
+			inventory[i].item = 0;
+			inventory[i].count = 0;
+		}
+		for(int i = 0; i < survivalInventory.length; i++) {
+			survivalInventory[i] = new ItemStack();
+			survivalInventory[i].item = 0;
+			survivalInventory[i].count = 0;
+		}
+		Main.level.inventoryUi.setItems(inventory);
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 		GL11.glEnable(GL11.GL_ALPHA_TEST);
@@ -366,7 +468,15 @@ public class Level implements ITickable, IDrawable {
 	}
 	@Override
 	public void unload() {
-		getUINonNull(ui).load();
+		/*
+		GL20.glUseProgram(0);
+		GL20.glDetachShader(pg, vs);
+		GL20.glDetachShader(pg, fs);
+		GL20.glDeleteShader(vs);
+		GL20.glDeleteShader(fs);
+		GL20.glDeleteProgram(pg);
+		*/
+		getUINonNull(ui).unload();
 		unloadSky();
 		for(Entity entity : entities) {
 			entity.unload();
@@ -382,13 +492,52 @@ public class Level implements ITickable, IDrawable {
 		
 	}
 	public int getRenderDistance() {
-		return 12;
+		return Constants.RENDER_DISTANCE;
 	}
 	public int getSeaLevel() {
 		return 40;
 	}
+	public void setUIProjectionScaling(float scale, boolean invertY) {
+		int invertYval = invertY?-1:1;
+		GL11.glMatrixMode(GL11.GL_PROJECTION);
+		GL11.glLoadIdentity();
+		float aspect = Display.getWidth()/(float)Display.getHeight();
+		GL11.glOrtho(-aspect*scale, aspect*scale, -1*scale*invertYval, 1*scale*invertYval, -1*scale, 1*scale);
+		GL11.glMatrixMode(GL11.GL_MODELVIEW);
+	}
+	private ItemStack[] survivalInventory;
+	public void initCreative() {
+		for(int i = 0; i < survivalInventory.length && i < inventory.length; i++) {
+			survivalInventory[i] = inventory[i];
+			inventory[i].item = i+1;
+			if(Item.ITEMS[inventory[i].item] == null) inventory[i].item = 0;
+			inventory[i].count = 0;
+		}
+	}
+	public void initSurvival() {
+		for(int i = 0; i < survivalInventory.length && i < inventory.length; i++) {
+			inventory[i] = survivalInventory[i];
+		}
+	}
 	@Override
 	public void tick(float delta) {
+		for(Entity entity : entitiesToAdd) {
+			entity.load();
+			entities.add(entity);
+			Vector3f pos = entity.transform.position;
+			//System.out.println("add: " + pos.x + ", " + pos.y + ", " + pos.z);
+		}
+		if(lastGamemode != gamemode) {
+			if(gamemode == Constants.GAMEMODE_CREATIVE) {
+				initCreative();
+				inventoryUi.setItems(inventory);
+			}else {
+				initSurvival();
+				inventoryUi.setItems(inventory);
+			}
+			lastGamemode = gamemode;
+		}
+		entitiesToAdd.clear();
 		input.scroll = Mouse.getDWheel()/100;
 		input.forward = Keyboard.isKeyDown(Keyboard.KEY_W);
 		input.backward = Keyboard.isKeyDown(Keyboard.KEY_S);
@@ -409,9 +558,10 @@ public class Level implements ITickable, IDrawable {
 		while(Mouse.next()) {
 			if(Mouse.getEventButtonState()) {
 				input.create = Mouse.getEventButton() == 1;
-				input.destroy = Mouse.getEventButton() == 0;
+				input.destroy = Mouse.getEventButton() == 0 && gamemode == Constants.GAMEMODE_CREATIVE;
 			}
 		}
+		input.destroy = input.destroy || (Mouse.isButtonDown(0) && gamemode == Constants.GAMEMODE_SURVIVAL);
 		if(lastUi != ui) {
 			getUINonNull(lastUi).unload();
 			getUINonNull(ui).load();
@@ -442,102 +592,7 @@ public class Level implements ITickable, IDrawable {
 			for(int x = camX-getRenderDistance(); x < camX+getRenderDistance(); x++) {
 				for(int z = camZ-getRenderDistance(); z < camZ+getRenderDistance(); z++) {
 					if(done || x < 0 || z < 0 || x >= chunks.length || z >= chunks.length || chunks[x][z] != null) continue;
-					Chunk chunk = new Chunk();
-					for(int i = 0; i < Chunk.SIZE; i++) {
-						for(int k = 0; k < Chunk.SIZE; k++) {
-							int h = (int)(mod.getValue((x*Chunk.SIZE+i)/256f, (z*Chunk.SIZE+k)/256f, 0)*32f+48f);
-							for(int j = 0; j < h; j++) {
-								if(j == h-1) {
-									chunk.block[i][j][k] = Block.GRASS.getId();
-									if(j <= getSeaLevel()) {
-										chunk.block[i][j][k] = Block.DIRT.getId();
-									}
-									int th = 4;
-									if(new Random().nextInt()%100==0 && i >= 3 && k >= 3 && i < Chunk.SIZE-3 && k < Chunk.SIZE-3 && j+th+1 < Chunk.HEIGHT && j > getSeaLevel()) {
-										
-										for(int l = -2; l <= 2; l++) {
-											for(int m = -2; m <= 2; m++) {
-												chunk.block[i+l][h+th-2][k+m] = Block.LEAVES.getId();
-												chunk.block[i+l][h+th-1][k+m] = Block.LEAVES.getId();
-											}
-										}
-										for(int l = -1; l <= 1; l++) {
-											for(int m = -1; m <= 1; m++) {
-												chunk.block[i+l][h+th][k+m] = Block.LEAVES.getId();
-											}
-											chunk.block[i+l][h+th+1][k] = Block.LEAVES.getId();
-											chunk.block[i][h+th+1][k+l] = Block.LEAVES.getId();
-										}
-										for(int l = 0; l < 4; l++) {
-											chunk.block[i][h+l][k] = Block.WOOD.getId();
-										}
-									}
-								}else if(j >= h-3) {
-									chunk.block[i][j][k] = Block.DIRT.getId();
-								}else {
-									chunk.block[i][j][k] = Block.STONE.getId();
-								}
-							}
-							for(int j = 0; j < Chunk.HEIGHT; j++) {
-								if(j < getSeaLevel() && !Block.BLOCKS[chunk.block[i][j][k]].isSolid()) {
-									chunk.water[i][j][k] = 15;
-									chunk.waterLock[i][j][k] = true;
-								}
-								chunk.light[i][j][k] = Block.BLOCKS[chunk.block[i][j][k]].getLightLevel();
-								
-							}
-						}
-					}
-					chunk.x = x * Chunk.SIZE;
-					chunk.z = z * Chunk.SIZE;
-					chunks[x][z] = chunk;
-					chunk.propagateSunlight();
-					chunk.propagateLight();
-					int x1 = x-1<0?x:x-1;
-					int z1 = z-1<0?z:z-1;
-					int x2 = x+1>=chunks.length?x:x+1;
-					int z2 = z+1>=chunks[0].length?z:z+1;
-					if(chunks[x][z1] != null) {
-						//chunks[x][z1].propagateSunlight();
-						chunks[x][z1].propagateLight();
-						loadLater(chunks[x][z1]);
-					}
-					if(chunks[x][z2] != null) {
-						//chunks[x][z2].propagateSunlight();
-						chunks[x][z2].propagateLight();
-						loadLater(chunks[x][z2]);
-					}
-					if(chunks[x1][z] != null) {
-						//chunks[x1][z].propagateSunlight();
-						chunks[x1][z].propagateLight();
-						loadLater(chunks[x1][z]);
-					}
-					if(chunks[x2][z] != null) {
-						//chunks[x2][z].propagateSunlight();
-						chunks[x2][z].propagateLight();
-						loadLater(chunks[x2][z]);
-					}
-					if(chunks[x1][z1] != null) {
-						//chunks[x1][z1].propagateSunlight();
-						chunks[x1][z1].propagateLight();
-						loadLater(chunks[x1][z1]);
-					}
-					if(chunks[x1][z2] != null) {
-						//chunks[x1][z2].propagateSunlight();
-						chunks[x1][z2].propagateLight();
-						loadLater(chunks[x1][z2]);
-					}
-					if(chunks[x2][z1] != null) {
-						//chunks[x2][z1].propagateSunlight();
-						chunks[x2][z1].propagateLight();
-						loadLater(chunks[x2][z1]);
-					}
-					if(chunks[x2][z2] != null) {
-						//chunks[x2][z2].propagateSunlight();
-						chunks[x2][z2].propagateLight();
-						loadLater(chunks[x2][z2]);
-					}
-					loadLater(chunk);
+					
 					done = true;
 				}
 			}
@@ -614,6 +669,15 @@ public class Level implements ITickable, IDrawable {
 	public void setBlock(int x, int y, int z, char id) {
 		int cx = x / Chunk.SIZE;
 		int cz = z / Chunk.SIZE;
+		int bx = x % Chunk.SIZE;
+		int bz = z % Chunk.SIZE;
+		int by = y % Chunk.HEIGHT;
+		setBlockAsync(x, y, z, id);
+		Client.setBlock((char)cx, (char)cz, (byte)bx, (byte)by, (byte)bz, id);
+	}
+	public void setBlockAsync(int x, int y, int z, char id) {
+		int cx = x / Chunk.SIZE;
+		int cz = z / Chunk.SIZE;
 		Chunk chunk = chunks[cx][cz];
 		int bx = x % Chunk.SIZE;
 		int bz = z % Chunk.SIZE;
@@ -687,5 +751,67 @@ public class Level implements ITickable, IDrawable {
 			entity.unload();
 			entities.remove(entity);
 		}
+	}
+	// I really should be threading this!!!
+	public void addChunk(int x, int z, char[][][] blocks) {
+		Chunk chunk = new Chunk();
+		for(int i = 0; i < Chunk.SIZE; i++) {
+			for(int k = 0; k < Chunk.SIZE; k++) {
+				for(int j = 0; j < Chunk.HEIGHT; j++) {
+					if(!Block.BLOCKS[blocks[i][j][k]].isFluid()) chunk.block[i][j][k] = blocks[i][j][k];
+					else chunk.water[i][j][k] = 15;
+				}
+			}
+		}
+		chunk.x = x * Chunk.SIZE;
+		chunk.z = z * Chunk.SIZE;
+		chunks[x][z] = chunk;
+		chunk.propagateSunlight();
+		chunk.propagateLight();
+		int x1 = x-1<0?x:x-1;
+		int z1 = z-1<0?z:z-1;
+		int x2 = x+1>=chunks.length?x:x+1;
+		int z2 = z+1>=chunks[0].length?z:z+1;
+		if(chunks[x][z1] != null) {
+			//chunks[x][z1].propagateSunlight();
+			chunks[x][z1].propagateLight();
+			loadLater(chunks[x][z1]);
+		}
+		if(chunks[x][z2] != null) {
+			//chunks[x][z2].propagateSunlight();
+			chunks[x][z2].propagateLight();
+			loadLater(chunks[x][z2]);
+		}
+		if(chunks[x1][z] != null) {
+			//chunks[x1][z].propagateSunlight();
+			chunks[x1][z].propagateLight();
+			loadLater(chunks[x1][z]);
+		}
+		if(chunks[x2][z] != null) {
+			//chunks[x2][z].propagateSunlight();
+			chunks[x2][z].propagateLight();
+			loadLater(chunks[x2][z]);
+		}
+		if(chunks[x1][z1] != null) {
+			//chunks[x1][z1].propagateSunlight();
+			chunks[x1][z1].propagateLight();
+			loadLater(chunks[x1][z1]);
+		}
+		if(chunks[x1][z2] != null) {
+			//chunks[x1][z2].propagateSunlight();
+			chunks[x1][z2].propagateLight();
+			loadLater(chunks[x1][z2]);
+		}
+		if(chunks[x2][z1] != null) {
+			//chunks[x2][z1].propagateSunlight();
+			chunks[x2][z1].propagateLight();
+			loadLater(chunks[x2][z1]);
+		}
+		if(chunks[x2][z2] != null) {
+			//chunks[x2][z2].propagateSunlight();
+			chunks[x2][z2].propagateLight();
+			loadLater(chunks[x2][z2]);
+		}
+		loadLater(chunk);
 	}
 }

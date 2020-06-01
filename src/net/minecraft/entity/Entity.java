@@ -15,6 +15,7 @@ public abstract class Entity implements ITickable, IDrawable {
 	public Transform transform = new Transform();
 	public boolean active = false;
 	public boolean dead = false;
+	public boolean ticking = false;
 	@Override
 	public void tick(float delta) {
 		if(Main.level.localPlayer == null) {
